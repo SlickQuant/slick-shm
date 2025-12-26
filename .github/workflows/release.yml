@@ -19,6 +19,12 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Create header archive
+        run: |
+          cd include
+          zip -r ../slick_shm-${{ steps.get_version.outputs.VERSION }}-headers.zip slick/
+          cd ..
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -47,7 +53,7 @@ jobs:
             ```
 
             #### Header-Only
-            Download and extract the source, then copy the `include/slick` directory to your project.
+            Download the `slick_shm-${{ steps.get_version.outputs.VERSION }}-headers.zip` from the Assets below, extract it, and copy the `slick/` directory to your project's include path.
 
             ### What's Changed
             See the [CHANGELOG](https://github.com/SlickQuant/slick_shm/blob/main/CHANGELOG.md) for details.
@@ -59,3 +65,5 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          files: |
+            slick_shm-${{ steps.get_version.outputs.VERSION }}-headers.zip
