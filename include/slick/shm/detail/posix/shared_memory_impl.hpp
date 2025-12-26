@@ -104,9 +104,51 @@ public:
                 return get_errno_error();
             }
             owns_shm_ = true;
+
+            // Check if the segment already existed by checking its size
+            struct stat sb;
+            if (fstat(shm_fd_, &sb) == -1) {
+                std::error_code ec = get_errno_error();
+                ::close(shm_fd_);
+                shm_fd_ = -1;
+                if (owns_shm_) {
+                    shm_unlink(name_.c_str());
+                    owns_shm_ = false;
+                }
+                return ec;
+            }
+
+            if (sb.st_size == 0 || mode == create_mode::open_always) {
+                // New segment (size is 0) or open_always mode - set the size
+                if (ftruncate(shm_fd_, static_cast<off_t>(size_)) == -1) {
+                    std::error_code ec = get_errno_error();
+                    ::close(shm_fd_);
+                    shm_fd_ = -1;
+                    if (owns_shm_) {
+                        shm_unlink(name_.c_str());
+                        owns_shm_ = false;
+                    }
+                    return ec;
+                }
+
+                // Query the actual allocated size after truncate (OS may round up)
+                if (fstat(shm_fd_, &sb) == -1) {
+                    std::error_code ec = get_errno_error();
+                    ::close(shm_fd_);
+                    shm_fd_ = -1;
+                    if (owns_shm_) {
+                        shm_unlink(name_.c_str());
+                        owns_shm_ = false;
+                    }
+                    return ec;
+                }
+            }
+            // For existing segments in open_or_create mode, use existing size
+            size_ = static_cast<std::size_t>(sb.st_size);
+            return map_impl();
         }
 
-        // Set the size using ftruncate
+        // For create_only mode, set the size using ftruncate
         if (ftruncate(shm_fd_, static_cast<off_t>(size_)) == -1) {
             std::error_code ec = get_errno_error();
             ::close(shm_fd_);
