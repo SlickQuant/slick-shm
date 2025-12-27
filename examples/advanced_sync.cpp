@@ -1,4 +1,4 @@
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory_view.hpp>
 
 #include <iostream>
 #include <thread>

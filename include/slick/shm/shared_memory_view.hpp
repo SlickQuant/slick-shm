@@ -1,7 +1,6 @@
 #pragma once
 
-#include "types.hpp"
-#include <cstddef>
+#include "shared_memory.hpp"
 #include <string>
 
 namespace slick {

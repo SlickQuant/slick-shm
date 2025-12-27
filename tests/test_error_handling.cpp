@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 
 #include <string>
 #include <chrono>

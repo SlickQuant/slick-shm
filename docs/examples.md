@@ -15,7 +15,7 @@ This document provides practical examples of using the slick_shm library.
 ### Creating and Writing to Shared Memory
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <cstring>
 #include <iostream>
 
@@ -38,7 +38,7 @@ int main() {
 ### Opening and Reading from Shared Memory
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <iostream>
 
 int main() {
@@ -60,7 +60,7 @@ int main() {
 ### Writer Process
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <cstring>
 #include <iostream>
 
@@ -92,7 +92,7 @@ int main() {
 ### Reader Process
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <iostream>
 
 struct Message {
@@ -122,7 +122,7 @@ int main() {
 ### Using Exceptions
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <iostream>
 
 int main() {
@@ -156,7 +156,7 @@ int main() {
 ### Using No-Throw Variants
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <iostream>
 
 int main() {
@@ -184,7 +184,7 @@ int main() {
 ### Using std::atomic for Simple Synchronization
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <atomic>
 #include <thread>
 #include <iostream>
@@ -238,7 +238,7 @@ void reader_main() {
 ### Producer-Consumer Pattern
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <atomic>
 #include <thread>
 
@@ -297,7 +297,7 @@ private:
 ### RAII Cleanup Helper
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <string>
 
 class scoped_shared_memory {
@@ -328,7 +328,7 @@ int main() {
 ### Type-Safe Wrapper
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <type_traits>
 
 template<typename T>
@@ -375,7 +375,7 @@ int main() {
 ### Shared Memory Pool
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <vector>
 #include <memory>
 

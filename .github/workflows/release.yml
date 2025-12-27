@@ -19,6 +19,27 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            # Extract the section for this version from CHANGELOG.md
+            VERSION="${{ github.ref_name }}"
+            # Use awk to extract content between this version header and the next version header
+            CHANGES=$(awk "/^## \[?${VERSION}\]?/,/^## \[?v[0-9]/" CHANGELOG.md | sed '1d;$d' | sed '/^$/d')
+
+            if [ -z "$CHANGES" ]; then
+              echo "CHANGELOG_CONTENT=No changelog entry found for this version." >> $GITHUB_OUTPUT
+            else
+              # Escape newlines for GitHub output
+              echo "CHANGELOG_CONTENT<<EOF" >> $GITHUB_OUTPUT
+              echo "$CHANGES" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "CHANGELOG_CONTENT=CHANGELOG.md not found." >> $GITHUB_OUTPUT
+          fi
+
       - name: Create header archive
         run: |
           cd include
@@ -30,35 +51,10 @@ jobs:
         with:
           name: Release ${{ github.ref_name }}
           body: |
-            ## slick_shm ${{ github.ref_name }}
+            ## Changes
 
-            A modern C++17 header-only, cross-platform shared memory library.
+            ${{ steps.changelog.outputs.CHANGELOG_CONTENT }}
 
-            ### Installation
-
-            #### vcpkg
-            ```bash
-            vcpkg install slick-shm
-            ```
-
-            #### CMake FetchContent
-            ```cmake
-            FetchContent_Declare(
-                slick_shm
-                GIT_REPOSITORY https://github.com/SlickQuant/slick_shm.git
-                GIT_TAG ${{ github.ref_name }}
-            )
-            FetchContent_MakeAvailable(slick_shm)
-            target_link_libraries(your_target PRIVATE slick::shm)
-            ```
-
-            #### Header-Only
-            Download the `slick_shm-${{ steps.get_version.outputs.VERSION }}-headers.zip` from the Assets below, extract it, and copy the `slick/` directory to your project's include path.
-
-            ### Platform Support
-            - ✅ Windows (MSVC 2017+, MinGW)
-            - ✅ Linux (GCC 7+, Clang 5+)
-            - ✅ macOS (Apple Clang)
           draft: false
           prerelease: false
           generate_release_notes: true

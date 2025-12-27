@@ -1,4 +1,4 @@
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 
 #include <iostream>
 #include <cstring>

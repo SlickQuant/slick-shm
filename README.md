@@ -56,7 +56,7 @@ target_link_libraries(your_target PRIVATE slick::shm)
 Simply copy the `include/slick` directory to your project and include it:
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 ```
 
 #### CMake FetchContent
@@ -95,7 +95,7 @@ target_link_libraries(your_target PRIVATE slick::shm)
 #### Writer Process
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <cstring>
 
 int main() {
@@ -115,7 +115,7 @@ int main() {
 #### Reader Process
 
 ```cpp
-#include <slick/shm.hpp>
+#include <slick/shm/shared_memory.hpp>
 #include <iostream>
 
 int main() {
