@@ -73,9 +73,9 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/SlickQuant/slick-shm.git
     GIT_TAG v0.1.0  # See https://github.com/SlickQuant/slick-shm/releases for latest version
 )
-FetchContent_MakeAvailable(slick::slick-shm)
+FetchContent_MakeAvailable(slick-shm)
 
-target_link_libraries(your_target PRIVATE slick::slick-shm)
+target_link_libraries(your_target PRIVATE slick::shm)
 ```
 
 #### CMake Integration

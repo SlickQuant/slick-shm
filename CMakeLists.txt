@@ -16,7 +16,8 @@ option(SLICK_SHM_INSTALL "Generate install target" ON)
 # Interface library (header-only)
 add_library(slick-shm INTERFACE)
 add_library(slick::shm ALIAS slick-shm)
-add_library(slick_shm ALIAS slick-shm) # For backward compatibility with older versions
+# For backward compatibility with older versions
+add_library(slick_shm ALIAS slick-shm)
 
 target_include_directories(slick-shm INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -24,6 +25,7 @@ target_include_directories(slick-shm INTERFACE
 )
 
 target_compile_features(slick-shm INTERFACE cxx_std_17)
+set_target_properties(slick-shm PROPERTIES EXPORT_NAME shm)
 
 # Platform-specific linking
 if(APPLE)
