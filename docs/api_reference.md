@@ -98,6 +98,43 @@ access_mode mode() const noexcept;
 
 Returns the access mode (read_only or read_write).
 
+##### is_creator()
+
+```cpp
+bool is_creator() const noexcept;
+```
+
+Returns `true` if this object created the shared memory segment, `false` if it opened an existing one.
+
+**Use Cases:**
+- Determine cleanup responsibilities
+- Track ownership in multi-process applications
+- Conditional behavior based on creator status
+
+**Behavior:**
+- `create_only`: Always returns `true` (only succeeds if creating new)
+- `open_existing`: Always returns `false` (only succeeds if opening existing)
+- `open_or_create`: Returns `true` if created new, `false` if opened existing
+- `open_always`: Returns `true` if created new, `false` if opened existing
+- After move operations: The flag is transferred to the moved-to object
+- Invalid/default-constructed objects: Returns `false`
+
+**Platform Details:**
+- **Windows**: Creator status is determined by checking if `GetLastError()` returned `ERROR_ALREADY_EXISTS` after `CreateFileMapping()`
+- **POSIX**: Creator status is tracked by the internal `owns_shm_` flag, set based on whether `shm_open()` was called with `O_CREAT | O_EXCL`
+
+**Example:**
+```cpp
+shared_memory shm(name, 1024, open_or_create);
+if (shm.is_creator()) {
+    std::cout << "Created new shared memory" << std::endl;
+    // Initialize data structures
+} else {
+    std::cout << "Opened existing shared memory" << std::endl;
+    // Use existing data
+}
+```
+
 ##### unmap()
 
 ```cpp

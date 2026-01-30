@@ -58,10 +58,12 @@ public:
           name_(std::move(other.name_)),
           name_utf8_(std::move(other.name_utf8_)),
           size_(other.size_),
-          mode_(other.mode_) {
+          mode_(other.mode_),
+          is_creator_(other.is_creator_) {
         other.file_mapping_handle_ = INVALID_HANDLE_VALUE;
         other.mapped_view_ = nullptr;
         other.size_ = 0;
+        other.is_creator_ = false;
     }
 
     platform_shared_memory& operator=(platform_shared_memory&& other) noexcept {
@@ -74,10 +76,12 @@ public:
             name_utf8_ = std::move(other.name_utf8_);
             size_ = other.size_;
             mode_ = other.mode_;
+            is_creator_ = other.is_creator_;
 
             other.file_mapping_handle_ = INVALID_HANDLE_VALUE;
             other.mapped_view_ = nullptr;
             other.size_ = 0;
+            other.is_creator_ = false;
         }
         return *this;
     }
@@ -124,6 +128,8 @@ public:
                 file_mapping_handle_ = INVALID_HANDLE_VALUE;
                 return make_error_code(errc::already_exists);
             }
+
+            is_creator_ = true;
         } else {
             // open_or_create or open_always
             file_mapping_handle_ = CreateFileMapping(
@@ -139,6 +145,9 @@ public:
                 file_mapping_handle_ = INVALID_HANDLE_VALUE;
                 return get_last_error();
             }
+
+            // Check if we created it or opened existing
+            is_creator_ = (GetLastError() != ERROR_ALREADY_EXISTS);
         }
 
         return map_impl();
@@ -152,6 +161,7 @@ public:
         name_ = to_platform_string(name);
         name_utf8_ = name;
         mode_ = access;
+        is_creator_ = false;  // Opening existing shared memory
 
         DWORD desired_access = get_map_access(access);
 
@@ -206,6 +216,10 @@ public:
         return mode_;
     }
 
+    bool is_creator() const noexcept {
+        return is_creator_;
+    }
+
     static bool remove(const char* name) noexcept {
         // On Windows, shared memory is automatically cleaned up when
         // the last handle is closed. There's no explicit remove operation.
@@ -235,6 +249,7 @@ private:
     std::string name_utf8_;         // Always UTF-8 for name() accessor
     std::size_t size_ = 0;
     access_mode mode_ = access_mode::read_write;
+    bool is_creator_ = false;       // True if this object created the shared memory
 
     std::error_code map_impl() {
         if (file_mapping_handle_ == INVALID_HANDLE_VALUE || file_mapping_handle_ == nullptr) {

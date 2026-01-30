@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(slick-shm
-    VERSION 0.1.3
+    VERSION 0.1.4
     LANGUAGES CXX
     DESCRIPTION "C++ header-only cross-platform shared memory library"
 )
-
-message(STATUS "slick-shm: ${PROJECT_VERSION}")
 
 # Options
 option(SLICK_SHM_BUILD_EXAMPLES "Build example programs" ON)
@@ -100,3 +98,5 @@ if(SLICK_SHM_INSTALL)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/slick-shm
     )
 endif()
+
+message(STATUS "${PROJECT_NAME}: ${PROJECT_VERSION}")

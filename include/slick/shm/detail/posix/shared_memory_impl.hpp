@@ -222,6 +222,10 @@ public:
         return mode_;
     }
 
+    bool is_creator() const noexcept {
+        return owns_shm_;
+    }
+
     static bool remove(const char* name) noexcept {
         if (!is_valid_name(name)) {
             return false;

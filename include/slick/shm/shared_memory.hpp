@@ -284,6 +284,19 @@ public:
         return impl_.mode();
     }
 
+    /**
+     * @brief Check if this object created the shared memory segment
+     * @return true if this object created the shared memory, false if it opened existing
+     * @note This is useful for determining cleanup responsibilities.
+     *       On Windows, creator status is determined by whether GetLastError() returned
+     *       ERROR_ALREADY_EXISTS after CreateFileMapping().
+     *       On POSIX, creator status is tracked via the owns_shm_ flag.
+     * @note After move operations, the is_creator flag is transferred to the new object.
+     */
+    bool is_creator() const noexcept {
+        return impl_.is_creator();
+    }
+
     // ========================================================================
     // Manual control
     // ========================================================================

@@ -1,6 +1,24 @@
 # Changelog
 
-## [Unreleased]
+## [v0.1.4] - 2026-01-30
+
+### Added
+- Add `is_creator()` method to `shared_memory` class to determine if the object created the segment or opened existing
+  - Returns `true` if the object created the shared memory, `false` if it opened existing
+  - Useful for conditional initialization and cleanup responsibilities
+  - Works with all creation modes: `create_only`, `open_existing`, `open_or_create`, `open_always`
+  - Creator status is preserved during move operations
+  - Windows: Tracks via `GetLastError() != ERROR_ALREADY_EXISTS` after `CreateFileMapping()`
+  - POSIX: Returns existing `owns_shm_` flag value
+- Add comprehensive test suite for `is_creator()` functionality (10 new test cases in `test_is_creator.cpp`)
+  - Tests all creation modes
+  - Tests move constructor and move assignment semantics
+  - Tests no-throw constructors
+  - Tests invalid objects
+- Add detailed API documentation for `is_creator()` in `docs/api_reference.md` with usage examples
+- Add feature to README features list
+
+## [v0.1.3] - 2026-01-29
 
 ### Fixed
 - Add missing `<type_traits>` include in `error.hpp` to fix compilation with strict compilers

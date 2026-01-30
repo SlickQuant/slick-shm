@@ -15,6 +15,7 @@ A modern C++17 header-only, cross-platform shared memory library.
 - **RAII**: Automatic resource management
 - **Hybrid error handling**: Both exception and no-throw variants
 - **Type-safe**: Clean, type-safe API
+- **Creator tracking**: Know if you created or opened existing shared memory via `is_creator()`
 - **Well-tested**: Comprehensive test suite with Catch2
 - **Well-documented**: Extensive API documentation and examples
 
