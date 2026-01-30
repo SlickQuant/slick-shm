@@ -158,6 +158,35 @@ TEST_CASE("Read/write access modes", "[access]") {
     }
 }
 
+TEST_CASE("Read-only create and open_or_create", "[access][read-only]") {
+    std::string name = unique_name("test_read_only_create");
+    shm_cleanup cleanup{name};
+
+    SECTION("Create-only with read-only access") {
+        shared_memory shm(name.c_str(), 256, create_only, access_mode::read_only);
+        REQUIRE(shm.is_valid());
+        REQUIRE(shm.mode() == access_mode::read_only);
+        REQUIRE(shm.size() >= 256);
+    }
+
+    SECTION("open_or_create creates with read-only access") {
+        shared_memory shm(name.c_str(), 512, open_or_create, access_mode::read_only);
+        REQUIRE(shm.is_valid());
+        REQUIRE(shm.mode() == access_mode::read_only);
+        REQUIRE(shm.size() >= 512);
+    }
+
+    SECTION("open_or_create opens existing with read-only access") {
+        shared_memory shm_rw(name.c_str(), 1024, create_only, access_mode::read_write);
+        REQUIRE(shm_rw.is_valid());
+
+        shared_memory shm_ro(name.c_str(), 2048, open_or_create, access_mode::read_only);
+        REQUIRE(shm_ro.is_valid());
+        REQUIRE(shm_ro.mode() == access_mode::read_only);
+        REQUIRE(shm_ro.size() == shm_rw.size());
+    }
+}
+
 TEST_CASE("RAII cleanup", "[raii]") {
     std::string name = unique_name("test_raii");
     shm_cleanup cleanup{name};

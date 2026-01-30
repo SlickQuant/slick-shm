@@ -50,6 +50,9 @@ inline bool is_valid_name(const char* name) {
     }
 #else
     // POSIX: name can contain '/' only at the start
+    if (len == 1 && name[0] == '/') {
+        return false;
+    }
     for (std::size_t i = 1; i < len; ++i) {
         if (name[i] == '/') {
             return false;

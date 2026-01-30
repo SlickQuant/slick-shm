@@ -166,6 +166,13 @@ TEST_CASE("Name validation", "[error][validation]") {
 #endif
 
 #ifdef SLICK_SHM_POSIX
+    SECTION("POSIX: slash-only name is invalid") {
+        REQUIRE_THROWS_AS(
+            shared_memory("/", 512, create_only),
+            shared_memory_error
+        );
+    }
+
     SECTION("POSIX: slash in middle of name is invalid") {
         // POSIX names can start with '/' but not contain it elsewhere
         REQUIRE_THROWS_AS(

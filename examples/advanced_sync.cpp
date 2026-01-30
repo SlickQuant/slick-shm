@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <cstdio>
 
 // Shared data structure
 struct shared_data {
@@ -22,8 +23,7 @@ void writer_thread(slick::shm::shared_memory_view view) {
         data->counter.store(i, std::memory_order_release);
 
         std::string msg = "Message " + std::to_string(i);
-        std::strncpy(data->message, msg.c_str(), sizeof(data->message) - 1);
-        data->message[sizeof(data->message) - 1] = '\0';
+        std::snprintf(data->message, sizeof(data->message), "%s", msg.c_str());
 
         std::cout << "[Writer] Wrote: " << msg << std::endl;
 

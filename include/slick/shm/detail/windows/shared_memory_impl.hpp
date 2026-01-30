@@ -24,8 +24,12 @@ inline std::wstring to_platform_string(const char* str) {
     if (!str) return L"";
     int size = MultiByteToWideChar(CP_UTF8, 0, str, -1, nullptr, 0);
     if (size == 0) return L"";
-    std::wstring result(size - 1, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, str, -1, &result[0], size);
+    std::wstring result(size, L'\0');
+    int written = MultiByteToWideChar(CP_UTF8, 0, str, -1, &result[0], size);
+    if (written == 0) return L"";
+    if (!result.empty() && result.back() == L'\0') {
+        result.pop_back();
+    }
     return result;
 }
 #else

@@ -80,96 +80,74 @@ public:
         size_ = size;
         mode_ = access;
 
-        int flags = get_open_flags(mode, access);
         int perms = 0666;  // Default permissions (modified by umask)
+        bool created = false;
+
+        auto cleanup_error = [&](std::error_code ec) -> std::error_code {
+            if (shm_fd_ != -1) {
+                ::close(shm_fd_);
+                shm_fd_ = -1;
+            }
+            if (owns_shm_) {
+                shm_unlink(name_.c_str());
+                owns_shm_ = false;
+            }
+            return ec;
+        };
 
         if (mode == create_mode::create_only) {
-            // Create only, fail if exists
-            flags |= O_EXCL;
-            shm_fd_ = shm_open(name_.c_str(), flags, perms);
-
+            shm_fd_ = shm_open(name_.c_str(), O_CREAT | O_EXCL | O_RDWR, perms);
             if (shm_fd_ == -1) {
                 if (errno == EEXIST) {
                     return make_error_code(errc::already_exists);
                 }
                 return get_errno_error();
             }
-            owns_shm_ = true;
-        } else {
-            // open_or_create or open_always
-            shm_fd_ = shm_open(name_.c_str(), flags, perms);
-
+            created = true;
+        } else if (mode == create_mode::open_or_create) {
+            shm_fd_ = shm_open(name_.c_str(), O_CREAT | O_EXCL | O_RDWR, perms);
             if (shm_fd_ == -1) {
-                return get_errno_error();
-            }
-            owns_shm_ = true;
-
-            // Check if the segment already existed by checking its size
-            struct stat sb;
-            if (fstat(shm_fd_, &sb) == -1) {
-                std::error_code ec = get_errno_error();
-                ::close(shm_fd_);
-                shm_fd_ = -1;
-                if (owns_shm_) {
-                    shm_unlink(name_.c_str());
-                    owns_shm_ = false;
+                if (errno != EEXIST) {
+                    return get_errno_error();
                 }
-                return ec;
-            }
-
-            if (sb.st_size == 0 || mode == create_mode::open_always) {
-                // New segment (size is 0) or open_always mode - set the size
-                if (ftruncate(shm_fd_, static_cast<off_t>(size_)) == -1) {
-                    std::error_code ec = get_errno_error();
-                    ::close(shm_fd_);
-                    shm_fd_ = -1;
-                    if (owns_shm_) {
-                        shm_unlink(name_.c_str());
-                        owns_shm_ = false;
-                    }
-                    return ec;
+                int flags = (access == access_mode::read_only) ? O_RDONLY : O_RDWR;
+                shm_fd_ = shm_open(name_.c_str(), flags, 0);
+                if (shm_fd_ == -1) {
+                    return get_errno_error();
                 }
-
-                // Query the actual allocated size after truncate (OS may round up)
-                if (fstat(shm_fd_, &sb) == -1) {
-                    std::error_code ec = get_errno_error();
-                    ::close(shm_fd_);
-                    shm_fd_ = -1;
-                    if (owns_shm_) {
-                        shm_unlink(name_.c_str());
-                        owns_shm_ = false;
-                    }
-                    return ec;
-                }
+            } else {
+                created = true;
             }
-            // For existing segments in open_or_create mode, use existing size
-            size_ = static_cast<std::size_t>(sb.st_size);
-            return map_impl();
+        } else {  // open_always
+            shm_fd_ = shm_open(name_.c_str(), O_CREAT | O_EXCL | O_RDWR, perms);
+            if (shm_fd_ == -1) {
+                if (errno != EEXIST) {
+                    return get_errno_error();
+                }
+                shm_fd_ = shm_open(name_.c_str(), O_RDWR, 0);
+                if (shm_fd_ == -1) {
+                    return get_errno_error();
+                }
+            } else {
+                created = true;
+            }
         }
 
-        // For create_only mode, set the size using ftruncate
-        if (ftruncate(shm_fd_, static_cast<off_t>(size_)) == -1) {
-            std::error_code ec = get_errno_error();
-            ::close(shm_fd_);
-            shm_fd_ = -1;
-            if (owns_shm_) {
-                shm_unlink(name_.c_str());
-                owns_shm_ = false;
-            }
-            return ec;
-        }
+        owns_shm_ = created;
 
-        // Query the actual allocated size (OS may round up)
         struct stat sb;
         if (fstat(shm_fd_, &sb) == -1) {
-            std::error_code ec = get_errno_error();
-            ::close(shm_fd_);
-            shm_fd_ = -1;
-            if (owns_shm_) {
-                shm_unlink(name_.c_str());
-                owns_shm_ = false;
+            return cleanup_error(get_errno_error());
+        }
+
+        if (created || mode == create_mode::open_always || sb.st_size == 0) {
+            if (ftruncate(shm_fd_, static_cast<off_t>(size_)) == -1) {
+                return cleanup_error(get_errno_error());
             }
-            return ec;
+
+            if (fstat(shm_fd_, &sb) == -1) {
+                return cleanup_error(get_errno_error());
+            }
         }
 
         size_ = static_cast<std::size_t>(sb.st_size);
@@ -331,17 +309,6 @@ private:
         return std::string("/") + name;
     }
 
-    static int get_open_flags(create_mode mode, access_mode access) {
-        int flags = O_CREAT;
-
-        if (access == access_mode::read_only) {
-            flags |= O_RDONLY;
-        } else {
-            flags |= O_RDWR;
-        }
-
-        return flags;
-    }
 
     static int get_mmap_prot(access_mode mode) {
         switch (mode) {
