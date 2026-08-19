@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.1.5] - 2026-08-19
 
 ### Fixed
 - The installed package config now `find_dependency(Threads)` before loading the
