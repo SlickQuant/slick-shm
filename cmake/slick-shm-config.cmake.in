@@ -1,5 +1,8 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
 include("${CMAKE_CURRENT_LIST_DIR}/slick-shm-targets.cmake")
 
 if(NOT TARGET slick::slick_shm AND TARGET slick::shm)

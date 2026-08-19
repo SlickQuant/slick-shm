@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The installed package config now `find_dependency(Threads)` before loading the
+  export set. The exported `slick::shm` target lists `Threads::Threads` in its link
+  interface on Apple and Unix, but the config never ensured that target existed, so
+  a consumer that had not already called `find_package(Threads)` itself failed at
+  generate time with `The link interface of target "slick::shm" contains:
+  Threads::Threads but the target was not found`. The failure surfaced transitively
+  and well away from its cause - `slick-queue` depends on `slick-shm`, so projects
+  that only ever asked for `slick-queue`, or for `slick-logger` above it, were the
+  ones that broke.
+
 ## [v0.1.4] - 2026-01-30
 
 ### Added
