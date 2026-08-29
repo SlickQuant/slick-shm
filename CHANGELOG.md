@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Windows name validation no longer rejects the documented `Global\` / `Local\` object
+  namespace prefixes. `is_valid_name()` rejected every name containing a backslash, so
+  `shared_memory("Global\my_shm", 1024, create_only)` failed with `errc::invalid_name`
+  even though the README and platform notes advertise and demonstrate exactly that form.
+  A leading `Global\`, `Local\` or `Session\<id>\` prefix (matched case-insensitively, as
+  the kernel does) is now accepted; a backslash anywhere past the prefix, or a prefix
+  with no object name after it, is still invalid.
+
 ## [v0.1.5] - 2026-08-19
 
 ### Fixed

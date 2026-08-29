@@ -23,11 +23,13 @@ This document describes platform-specific behavior and considerations for slick-
 ### Name Format
 
 - Names are used as-is (no automatic prefix)
-- User can optionally prefix with:
+- User can optionally prefix with an object namespace (matched case-insensitively):
   - `Global\` for cross-session access (requires appropriate privileges)
   - `Local\` for session-local access (default if no prefix)
-- Invalid characters: `\ / : * ? " < > |`
-- Maximum length: 255 characters
+  - `Session\<id>\` for a specific terminal services session
+- Invalid characters: `\ / : * ? " < > |` - the only backslash a name may contain
+  is the separator of a leading namespace prefix
+- Maximum length: 255 characters, prefix included
 
 ### Example Names
 
@@ -40,6 +42,9 @@ shared_memory shm("Global\\my_shm", 1024, create_only);
 
 // Local (explicit)
 shared_memory shm("Local\\my_shm", 1024, create_only);
+
+// Specific session
+shared_memory shm("Session\\1\\my_shm", 1024, create_only);
 ```
 
 ### Size Limits

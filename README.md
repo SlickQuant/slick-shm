@@ -282,7 +282,7 @@ Tests cover:
 ### Windows
 
 - Uses system paging file for backing
-- Names used as-is (can prefix with `Global\` or `Local\`)
+- Names used as-is (can prefix with `Global\`, `Local\`, or `Session\<id>\`)
 - Automatic cleanup when last handle closes
 
 ### Linux/macOS (POSIX)

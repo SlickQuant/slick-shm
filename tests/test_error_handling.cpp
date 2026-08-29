@@ -163,6 +163,52 @@ TEST_CASE("Name validation", "[error][validation]") {
             );
         }
     }
+
+    SECTION("Windows: object namespace prefixes are valid names") {
+        // A backslash is legal as the separator of a leading object namespace
+        // prefix. Validated directly so the test does not need the
+        // SeCreateGlobalPrivilege that a Global namespace object requires.
+        const char* valid_names[] = {
+            "Global\\my_shm",
+            "Local\\my_shm",
+            "global\\my_shm",        // prefixes are case-insensitive
+            "LOCAL\\my_shm",
+            "Session\\1\\my_shm",
+            "Session\\42\\my_shm"
+        };
+
+        for (const char* valid : valid_names) {
+            REQUIRE(detail::is_valid_name(valid));
+        }
+    }
+
+    SECTION("Windows: malformed namespace prefixes are invalid") {
+        const char* bad_names[] = {
+            "Global\\",              // prefix with no object name
+            "Local\\",
+            "Session\\1\\",
+            "Global\\sub\\my_shm",   // backslash past the prefix
+            "Local\\my\\shm",
+            "Session\\my_shm",       // missing session id
+            "Session\\x1\\my_shm",   // non-numeric session id
+            "Globals\\my_shm",       // not an object namespace prefix
+            "\\my_shm"
+        };
+
+        for (const char* bad : bad_names) {
+            REQUIRE_FALSE(detail::is_valid_name(bad));
+        }
+    }
+
+    SECTION("Windows: Local prefixed segment can be created and opened") {
+        std::string name = "Local\\" + unique_name("test_local");
+
+        shared_memory shm(name.c_str(), 512, create_only);
+        REQUIRE(shm.is_valid());
+
+        shared_memory opener(name.c_str(), open_existing);
+        REQUIRE(opener.is_valid());
+    }
 #endif
 
 #ifdef SLICK_SHM_POSIX
