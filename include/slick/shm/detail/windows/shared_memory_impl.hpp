@@ -100,7 +100,12 @@ public:
         size_ = size;
         mode_ = access;
 
-        DWORD protect = get_protection_flags(access);
+        // The section is always created read-write so that access_mode stays a
+        // property of *this* process's view, matching POSIX. A PAGE_READONLY
+        // section would be read-only for every process, forever - no later
+        // opener could ever map it for writing. The caller's own view is still
+        // restricted below via get_map_access().
+        DWORD protect = PAGE_READWRITE;
 
         // Split 64-bit size into high and low 32-bit parts
         DWORD size_high = static_cast<DWORD>((size >> 32) & 0xFFFFFFFF);
@@ -301,17 +306,6 @@ private:
         }
 
         size_ = 0;
-    }
-
-    static DWORD get_protection_flags(access_mode mode) {
-        switch (mode) {
-            case access_mode::read_only:
-                return PAGE_READONLY;
-            case access_mode::read_write:
-                return PAGE_READWRITE;
-            default:
-                return PAGE_READWRITE;
-        }
     }
 
     static DWORD get_map_access(access_mode mode) {

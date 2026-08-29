@@ -204,6 +204,10 @@ To ensure portability across all platforms:
 - Uses process security context
 - Default permissions typically sufficient
 - ACLs not exposed in this library
+- The file mapping is always created with `PAGE_READWRITE`; `access_mode::read_only`
+  restricts the view this process maps, not the segment. Creating with
+  `PAGE_READONLY` would bar every future process from ever mapping it for writing,
+  which POSIX does not do.
 
 ### POSIX (Linux/macOS)
 

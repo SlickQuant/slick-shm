@@ -185,6 +185,24 @@ TEST_CASE("Read-only create and open_or_create", "[access][read-only]") {
         REQUIRE(shm_ro.mode() == access_mode::read_only);
         REQUIRE(shm_ro.size() == shm_rw.size());
     }
+
+    SECTION("Creating read-only does not lock the segment for later openers") {
+        // access_mode describes this process's mapping, not the segment itself:
+        // a later opener has to be able to map the same segment read-write.
+        shared_memory creator(name.c_str(), 256, create_only, access_mode::read_only);
+        REQUIRE(creator.is_valid());
+        REQUIRE(creator.mode() == access_mode::read_only);
+
+        shared_memory writer(name.c_str(), open_existing, access_mode::read_write);
+        REQUIRE(writer.is_valid());
+        REQUIRE(writer.mode() == access_mode::read_write);
+
+        const char* data = "written by the opener";
+        std::memcpy(writer.data(), data, std::strlen(data) + 1);
+
+        // The read-only creator observes what the writer stored.
+        REQUIRE(std::strcmp(static_cast<const char*>(creator.data()), data) == 0);
+    }
 }
 
 TEST_CASE("RAII cleanup", "[raii]") {

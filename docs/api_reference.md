@@ -239,6 +239,13 @@ enum class access_mode {
 };
 ```
 
+`access_mode` describes the calling process's own mapping, not the segment. A
+segment created with `access_mode::read_only` gives *this* process a read-only
+mapping; another process is still free to open the same segment read-write. This
+is the behavior on every platform - on Windows the underlying section is always
+created read-write so that a read-only creator cannot lock the segment against
+future writers.
+
 ### create_mode
 
 ```cpp

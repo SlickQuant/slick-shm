@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+- `access_mode` now means the same thing on every platform: it restricts the calling
+  process's mapping, not the segment. Windows used to pass `PAGE_READONLY` to
+  `CreateFileMapping()` when a segment was created `read_only`, which made the section
+  read-only for *every* process forever - no later opener could map it for writing,
+  while the same code on POSIX left the segment writable for others. Windows now always
+  creates the section `PAGE_READWRITE` and restricts only its own view, matching POSIX.
+
 ### Fixed
 - POSIX `create()` no longer leaks the segment when `mmap()` fails on a newly created
   one. The `fstat`/`ftruncate` error paths unlinked the segment, but the final
