@@ -2,12 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ '**' ]
   pull_request:
-    branches: [ main ]
 
 permissions:
   contents: read
+
+# A branch with an open PR triggers both push and pull_request; keep only the
+# newest run per ref alive.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
