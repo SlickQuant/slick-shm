@@ -161,7 +161,14 @@ public:
 
         size_ = static_cast<std::size_t>(sb.st_size);
 
-        return map_impl();
+        // A failed mapping must not leave behind a segment we just created:
+        // close_impl() never unlinks, so route the failure through the same
+        // cleanup the fstat/ftruncate paths use.
+        if (std::error_code ec = map_impl()) {
+            return cleanup_error(ec);
+        }
+
+        return {};
     }
 
     std::error_code open(const char* name, access_mode access) {

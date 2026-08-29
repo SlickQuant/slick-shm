@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Fixed
+- POSIX `create()` no longer leaks the segment when `mmap()` fails on a newly created
+  one. The `fstat`/`ftruncate` error paths unlinked the segment, but the final
+  `map_impl()` call did not, and `close()` never unlinks - so a failed mapping (an
+  unsatisfiable size, for instance) left the segment behind in `/dev/shm` until it was
+  removed by hand. The mapping failure is now routed through the same cleanup, which
+  unlinks only when this call created the segment.
 - Windows name validation no longer rejects the documented `Global\` / `Local\` object
   namespace prefixes. `is_valid_name()` rejected every name containing a backslash, so
   `shared_memory("Global\my_shm", 1024, create_only)` failed with `errc::invalid_name`

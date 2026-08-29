@@ -237,3 +237,22 @@ TEST_CASE("Name validation", "[error][validation]") {
     }
 #endif
 }
+
+#ifdef SLICK_SHM_POSIX
+TEST_CASE("Failed create leaves no segment behind", "[error][cleanup]") {
+    // The segment is created before it is sized and mapped, so every failure
+    // after shm_open() has to unlink it again - close() alone never does.
+    // A size this large is accepted by ftruncate() on tmpfs but can never be
+    // mapped, which drives the failure into the mmap() path.
+    std::string name = unique_name("test_leak");
+    shm_cleanup cleanup{name};
+
+    constexpr std::size_t unmappable_size = std::size_t{1} << 62;
+    shared_memory shm(name.c_str(), unmappable_size, create_only,
+                      access_mode::read_write, std::nothrow);
+
+    REQUIRE_FALSE(shm.is_valid());
+    REQUIRE(shm.last_error());
+    REQUIRE_FALSE(shared_memory::exists(name.c_str()));
+}
+#endif

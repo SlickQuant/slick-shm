@@ -234,6 +234,11 @@ shm.close();  // Optional: explicit close
 shared_memory::remove("test");
 ```
 
+A construction that fails cleans up after itself: if the segment was created by
+this call and a later step (sizing or mapping) fails, it is unlinked again
+before the error is returned. Only successfully created segments need
+`remove()`.
+
 ### Best Practice
 
 For portable code, always call `remove()`:
