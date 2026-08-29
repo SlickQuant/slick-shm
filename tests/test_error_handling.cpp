@@ -4,6 +4,13 @@
 #include <string>
 #include <chrono>
 
+#ifdef SLICK_SHM_POSIX
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#endif
+
 using namespace slick::shm;
 
 namespace {
@@ -14,6 +21,27 @@ std::string unique_name(const char* prefix) {
     // Use modulo to keep the timestamp shorter while still being unique (macOS has 31-char limit)
     return std::string(prefix) + std::to_string(millis % 100000000);
 }
+
+#ifdef SLICK_SHM_POSIX
+// Number of descriptors this process currently holds, or -1 where the platform
+// does not expose them.
+int count_open_fds() {
+    const char* dirs[] = { "/proc/self/fd", "/dev/fd" };
+    for (const char* dir : dirs) {
+        DIR* d = opendir(dir);
+        if (d == nullptr) {
+            continue;
+        }
+        int n = 0;
+        while (readdir(d) != nullptr) {
+            ++n;
+        }
+        closedir(d);
+        return n;
+    }
+    return -1;
+}
+#endif
 
 struct shm_cleanup {
     std::string name;
@@ -254,5 +282,37 @@ TEST_CASE("Failed create leaves no segment behind", "[error][cleanup]") {
     REQUIRE_FALSE(shm.is_valid());
     REQUIRE(shm.last_error());
     REQUIRE_FALSE(shared_memory::exists(name.c_str()));
+}
+#endif
+
+#ifdef SLICK_SHM_POSIX
+TEST_CASE("Failed open does not leak the descriptor", "[error][cleanup]") {
+    // Build a segment out of band whose size can never be mapped, so that the
+    // library's open() gets past shm_open()/fstat() and fails at mmap().
+    std::string name = unique_name("test_ofd");
+    shm_cleanup cleanup{name};
+
+    std::string path = "/" + name;
+    int fd = shm_open(path.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
+    REQUIRE(fd != -1);
+    bool sized = ftruncate(fd, static_cast<off_t>(std::size_t{1} << 62)) == 0;
+    ::close(fd);
+
+    if (!sized) {
+        return;  // platform refuses the size outright - nothing to exercise
+    }
+
+    int before = count_open_fds();
+
+    shared_memory shm(name.c_str(), open_existing, access_mode::read_write, std::nothrow);
+
+    REQUIRE_FALSE(shm.is_valid());
+    REQUIRE(shm.last_error());
+
+    // Checked while shm is still alive: the descriptor has to be released on
+    // the error path, not merely by the destructor.
+    if (before >= 0) {
+        REQUIRE(count_open_fds() == before);
+    }
 }
 #endif

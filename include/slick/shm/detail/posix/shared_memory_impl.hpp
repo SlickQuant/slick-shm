@@ -203,7 +203,15 @@ public:
 
         size_ = static_cast<std::size_t>(sb.st_size);
 
-        return map_impl();
+        // Nothing to unlink here - this call did not create the segment - but
+        // the descriptor must not outlive the failed open, same as above.
+        if (std::error_code ec = map_impl()) {
+            ::close(shm_fd_);
+            shm_fd_ = -1;
+            return ec;
+        }
+
+        return {};
     }
 
     void unmap() noexcept {

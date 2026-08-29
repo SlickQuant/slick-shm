@@ -9,6 +9,9 @@
   unsatisfiable size, for instance) left the segment behind in `/dev/shm` until it was
   removed by hand. The mapping failure is now routed through the same cleanup, which
   unlinks only when this call created the segment.
+- POSIX `open()` now releases the descriptor when `mmap()` fails, instead of holding it
+  until the object is destroyed. Matches the `fstat()` error path just above it, and
+  matters for a no-throw construction whose failed object stays alive.
 - Windows name validation no longer rejects the documented `Global\` / `Local\` object
   namespace prefixes. `is_valid_name()` rejected every name containing a backslash, so
   `shared_memory("Global\my_shm", 1024, create_only)` failed with `errc::invalid_name`
