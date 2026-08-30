@@ -9,6 +9,7 @@ FetchContent_MakeAvailable(Catch2)
 
 # Main test executable
 add_executable(slick_shm_tests
+    test_helpers.hpp
     test_main.cpp
     test_create_open.cpp
     test_error_handling.cpp

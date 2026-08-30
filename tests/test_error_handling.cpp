@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <slick/shm/shared_memory.hpp>
+#include "test_helpers.hpp"
 
 #include <string>
-#include <chrono>
 
 #ifdef SLICK_SHM_POSIX
 #include <sys/mman.h>
@@ -12,15 +12,9 @@
 #endif
 
 using namespace slick::shm;
+using namespace slick_shm_test;
 
 namespace {
-
-std::string unique_name(const char* prefix) {
-    auto now = std::chrono::system_clock::now().time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    // Use modulo to keep the timestamp shorter while still being unique (macOS has 31-char limit)
-    return std::string(prefix) + std::to_string(millis % 100000000);
-}
 
 #ifdef SLICK_SHM_POSIX
 // Number of descriptors this process currently holds, or -1 where the platform
@@ -42,13 +36,6 @@ int count_open_fds() {
     return -1;
 }
 #endif
-
-struct shm_cleanup {
-    std::string name;
-    ~shm_cleanup() {
-        shared_memory::remove(name.c_str());
-    }
-};
 
 }  // namespace
 
