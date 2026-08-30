@@ -1,31 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <slick/shm/shared_memory.hpp>
+#include "test_helpers.hpp"
 
 #include <cstring>
 #include <string>
-#include <chrono>
 
 using namespace slick::shm;
-
-namespace {
-
-// Helper to generate unique names (kept short for macOS 31-char limit including "/" prefix)
-std::string unique_name(const char* prefix) {
-    auto now = std::chrono::system_clock::now().time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    // Use modulo to keep the timestamp shorter while still being unique
-    return std::string(prefix) + std::to_string(millis % 100000000);
-}
-
-// RAII cleanup helper
-struct shm_cleanup {
-    std::string name;
-    ~shm_cleanup() {
-        shared_memory::remove(name.c_str());
-    }
-};
-
-}  // namespace
+using namespace slick_shm_test;
 
 TEST_CASE("Create shared memory with create_only", "[create]") {
     std::string name = unique_name("test_create");
@@ -185,6 +166,55 @@ TEST_CASE("Read-only create and open_or_create", "[access][read-only]") {
         REQUIRE(shm_ro.mode() == access_mode::read_only);
         REQUIRE(shm_ro.size() == shm_rw.size());
     }
+
+    SECTION("Creating read-only does not lock the segment for later openers") {
+        // access_mode describes this process's mapping, not the segment itself:
+        // a later opener has to be able to map the same segment read-write.
+        shared_memory creator(name.c_str(), 256, create_only, access_mode::read_only);
+        REQUIRE(creator.is_valid());
+        REQUIRE(creator.mode() == access_mode::read_only);
+
+        shared_memory writer(name.c_str(), open_existing, access_mode::read_write);
+        REQUIRE(writer.is_valid());
+        REQUIRE(writer.mode() == access_mode::read_write);
+
+        const char* data = "written by the opener";
+        std::memcpy(writer.data(), data, std::strlen(data) + 1);
+
+        // The read-only creator observes what the writer stored.
+        REQUIRE(std::strcmp(static_cast<const char*>(creator.data()), data) == 0);
+    }
+}
+
+TEST_CASE("open_always sizing of an existing segment", "[create][open_always]") {
+    // Once the segment exists, the size passed to open_always is only a
+    // request - see "Sizing an existing segment" in docs/api_reference.md.
+    std::string name = unique_name("test_oa_size");
+    shm_cleanup cleanup{name};
+
+    shared_memory creator(name.c_str(), 4096, create_only);
+    REQUIRE(creator.is_valid());
+    const std::size_t created_size = creator.size();
+
+    // Deliberately grows: shrinking a segment that `creator` still has mapped
+    // would leave it facing SIGBUS past the new end on Linux.
+    shared_memory opener(name.c_str(), created_size * 4, open_always);
+    REQUIRE(opener.is_valid());
+
+#if defined(SLICK_SHM_LINUX)
+    // Linux resizes an existing segment even while it is mapped.
+    REQUIRE(opener.size() == created_size * 4);
+#elif defined(SLICK_SHM_WINDOWS)
+    // Windows hands back the existing section untouched.
+    REQUIRE(opener.size() == created_size);
+#endif
+    // macOS depends on whether the segment is held open elsewhere, so the
+    // outcome there is deliberately left unasserted.
+
+    // What every platform does guarantee: the mapping really is size() bytes,
+    // which is why callers must work from size() and not from their request.
+    REQUIRE(opener.size() > 0);
+    std::memset(opener.data(), 0, opener.size());
 }
 
 TEST_CASE("RAII cleanup", "[raii]") {

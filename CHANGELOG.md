@@ -1,5 +1,54 @@
 # Changelog
 
+## [v0.1.6] - 2026-08-30
+
+### Changed
+- `shared_memory_view` is now allocation-free to copy. It borrows the name pointer
+  instead of holding its own `std::string`, so `sizeof(shared_memory_view)` drops from
+  56 to 32 bytes and its copy constructor and copy assignment become `noexcept`. Passing
+  a view by value no longer allocates - which it previously did for any name longer than
+  the standard library's small-string capacity (15 characters on MSVC).
+- To make that borrow sound, `shared_memory` now keeps the name behind `name()` in
+  address-stable storage rather than a `std::string`. Moving a `shared_memory` transfers
+  a pointer and leaves the characters where they are, so views built from it stay valid
+  across a move, a move-assignment, or a `std::vector<shared_memory>` reallocation. As a
+  side effect `sizeof(shared_memory)` drops from 112 to 88 bytes.
+- Constructing a `shared_memory_view` from a temporary `shared_memory` is now a
+  compile-time error rather than an immediately dangling view.
+- `access_mode` now means the same thing on every platform: it restricts the calling
+  process's mapping, not the segment. Windows used to pass `PAGE_READONLY` to
+  `CreateFileMapping()` when a segment was created `read_only`, which made the section
+  read-only for *every* process forever - no later opener could map it for writing,
+  while the same code on POSIX left the segment writable for others. Windows now always
+  creates the section `PAGE_READWRITE` and restricts only its own view, matching POSIX.
+
+### Fixed
+- POSIX `create()` no longer leaks the segment when `mmap()` fails on a newly created
+  one. The `fstat`/`ftruncate` error paths unlinked the segment, but the final
+  `map_impl()` call did not, and `close()` never unlinks - so a failed mapping (an
+  unsatisfiable size, for instance) left the segment behind in `/dev/shm` until it was
+  removed by hand. The mapping failure is now routed through the same cleanup, which
+  unlinks only when this call created the segment.
+- POSIX `open()` now releases the descriptor when `mmap()` fails, instead of holding it
+  until the object is destroyed. Matches the `fstat()` error path just above it, and
+  matters for a no-throw construction whose failed object stays alive.
+- Windows name validation no longer rejects the documented `Global\` / `Local\` object
+  namespace prefixes. `is_valid_name()` rejected every name containing a backslash, so
+  `shared_memory("Global\my_shm", 1024, create_only)` failed with `errc::invalid_name`
+  even though the README and platform notes advertise and demonstrate exactly that form.
+  A leading `Global\`, `Local\` or `Session\<id>\` prefix (matched case-insensitively, as
+  the kernel does) is now accepted; a backslash anywhere past the prefix, or a prefix
+  with no object name after it, is still invalid.
+
+### Documentation
+- Document that `size` is a request, not a guarantee, once the segment already exists.
+  `open_always` resizes on Linux, resizes on macOS only when no other process holds the
+  segment open, and never resizes on Windows - so `size()` can come back **smaller than
+  requested**, and on Linux an existing segment can be shrunk while other processes have
+  it mapped. Adds a per-platform table and the `size()` check idiom to the API reference,
+  rewrites the macOS-only note in the platform notes to cover all three platforms, and
+  adds a best-practice line to the README. A test now pins the per-platform outcome.
+
 ## [v0.1.5] - 2026-08-19
 
 ### Fixed

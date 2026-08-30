@@ -1,30 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include <slick/shm/shared_memory.hpp>
+#include "test_helpers.hpp"
 
 #include <string>
-#include <chrono>
 #include <cstdlib>
 #include <thread>
 
 using namespace slick::shm;
-
-namespace {
-
-std::string unique_name(const char* prefix) {
-    auto now = std::chrono::system_clock::now().time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    // Use modulo to keep the timestamp shorter while still being unique (macOS has 31-char limit)
-    return std::string(prefix) + std::to_string(millis % 100000000);
-}
-
-struct shm_cleanup {
-    std::string name;
-    ~shm_cleanup() {
-        shared_memory::remove(name.c_str());
-    }
-};
-
-}  // namespace
+using namespace slick_shm_test;
 
 TEST_CASE("Cross-process communication", "[cross-process]") {
     std::string name = unique_name("test_cross_proc");

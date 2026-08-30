@@ -219,6 +219,17 @@ shared_memory shm("name", 1024, create_only);
 shared_memory_view view(shm);  // Lightweight, copyable
 ```
 
+Views are **allocation-free to copy** (they hold only `data`, `size`, `mode`, and a
+borrowed name pointer), which makes them cheap to pass by value into worker
+threads or hot data paths. The `name()` pointer is **non-owning**: it refers to
+the `shared_memory` object (or caller-provided buffer) the view was built from,
+so that source must outlive the view.
+
+Moving the source is safe: `shared_memory` keeps its name in address-stable
+storage, so a view stays valid when its source is moved or move-assigned,
+including when a `std::vector<shared_memory>` reallocates. Building a view from a
+temporary is rejected at compile time.
+
 ### Error Handling
 
 #### Exception-Based
@@ -282,7 +293,7 @@ Tests cover:
 ### Windows
 
 - Uses system paging file for backing
-- Names used as-is (can prefix with `Global\` or `Local\`)
+- Names used as-is (can prefix with `Global\`, `Local\`, or `Session\<id>\`)
 - Automatic cleanup when last handle closes
 
 ### Linux/macOS (POSIX)
@@ -304,6 +315,7 @@ See [platform_notes.md](docs/platform_notes.md) for detailed information.
 3. **Synchronize access**: Use `std::atomic` or external synchronization
 4. **Handle errors**: Always check for errors (exceptions or `is_valid()`)
 5. **Use views**: Pass `shared_memory_view` to avoid ownership confusion
+6. **Trust `size()`, not your request**: with `open_or_create` / `open_always` an existing segment may keep its own size, so `size()` can be smaller than the size you asked for. Use `create_only` when the size must be exact. See [Sizing an existing segment](docs/api_reference.md#sizing-an-existing-segment)
 
 ## License
 

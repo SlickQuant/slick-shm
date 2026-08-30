@@ -161,7 +161,14 @@ public:
 
         size_ = static_cast<std::size_t>(sb.st_size);
 
-        return map_impl();
+        // A failed mapping must not leave behind a segment we just created:
+        // close_impl() never unlinks, so route the failure through the same
+        // cleanup the fstat/ftruncate paths use.
+        if (std::error_code ec = map_impl()) {
+            return cleanup_error(ec);
+        }
+
+        return {};
     }
 
     std::error_code open(const char* name, access_mode access) {
@@ -196,7 +203,15 @@ public:
 
         size_ = static_cast<std::size_t>(sb.st_size);
 
-        return map_impl();
+        // Nothing to unlink here - this call did not create the segment - but
+        // the descriptor must not outlive the failed open, same as above.
+        if (std::error_code ec = map_impl()) {
+            ::close(shm_fd_);
+            shm_fd_ = -1;
+            return ec;
+        }
+
+        return {};
     }
 
     void unmap() noexcept {
@@ -262,7 +277,7 @@ private:
     int shm_fd_ = -1;
     void* mapped_addr_ = nullptr;
     std::string name_;  // Formatted name with "/" prefix for POSIX API
-    std::string original_name_;  // Original name without prefix for public accessor
+    stable_name original_name_;  // Original name for public accessor; address-stable for views
     std::size_t size_ = 0;
     access_mode mode_ = access_mode::read_write;
     bool owns_shm_ = false;  // Track if we created it (for unlinking)

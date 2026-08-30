@@ -1,26 +1,41 @@
 #include <catch2/catch_test_macros.hpp>
 #include <slick/shm/shared_memory.hpp>
+#include "test_helpers.hpp"
 
 #include <string>
-#include <chrono>
+
+#ifdef SLICK_SHM_POSIX
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
+#endif
 
 using namespace slick::shm;
+using namespace slick_shm_test;
 
 namespace {
 
-std::string unique_name(const char* prefix) {
-    auto now = std::chrono::system_clock::now().time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    // Use modulo to keep the timestamp shorter while still being unique (macOS has 31-char limit)
-    return std::string(prefix) + std::to_string(millis % 100000000);
-}
-
-struct shm_cleanup {
-    std::string name;
-    ~shm_cleanup() {
-        shared_memory::remove(name.c_str());
+#ifdef SLICK_SHM_POSIX
+// Number of descriptors this process currently holds, or -1 where the platform
+// does not expose them.
+int count_open_fds() {
+    const char* dirs[] = { "/proc/self/fd", "/dev/fd" };
+    for (const char* dir : dirs) {
+        DIR* d = opendir(dir);
+        if (d == nullptr) {
+            continue;
+        }
+        int n = 0;
+        while (readdir(d) != nullptr) {
+            ++n;
+        }
+        closedir(d);
+        return n;
     }
-};
+    return -1;
+}
+#endif
 
 }  // namespace
 
@@ -163,6 +178,52 @@ TEST_CASE("Name validation", "[error][validation]") {
             );
         }
     }
+
+    SECTION("Windows: object namespace prefixes are valid names") {
+        // A backslash is legal as the separator of a leading object namespace
+        // prefix. Validated directly so the test does not need the
+        // SeCreateGlobalPrivilege that a Global namespace object requires.
+        const char* valid_names[] = {
+            "Global\\my_shm",
+            "Local\\my_shm",
+            "global\\my_shm",        // prefixes are case-insensitive
+            "LOCAL\\my_shm",
+            "Session\\1\\my_shm",
+            "Session\\42\\my_shm"
+        };
+
+        for (const char* valid : valid_names) {
+            REQUIRE(detail::is_valid_name(valid));
+        }
+    }
+
+    SECTION("Windows: malformed namespace prefixes are invalid") {
+        const char* bad_names[] = {
+            "Global\\",              // prefix with no object name
+            "Local\\",
+            "Session\\1\\",
+            "Global\\sub\\my_shm",   // backslash past the prefix
+            "Local\\my\\shm",
+            "Session\\my_shm",       // missing session id
+            "Session\\x1\\my_shm",   // non-numeric session id
+            "Globals\\my_shm",       // not an object namespace prefix
+            "\\my_shm"
+        };
+
+        for (const char* bad : bad_names) {
+            REQUIRE_FALSE(detail::is_valid_name(bad));
+        }
+    }
+
+    SECTION("Windows: Local prefixed segment can be created and opened") {
+        std::string name = "Local\\" + unique_name("test_local");
+
+        shared_memory shm(name.c_str(), 512, create_only);
+        REQUIRE(shm.is_valid());
+
+        shared_memory opener(name.c_str(), open_existing);
+        REQUIRE(opener.is_valid());
+    }
 #endif
 
 #ifdef SLICK_SHM_POSIX
@@ -191,3 +252,54 @@ TEST_CASE("Name validation", "[error][validation]") {
     }
 #endif
 }
+
+#ifdef SLICK_SHM_POSIX
+TEST_CASE("Failed create leaves no segment behind", "[error][cleanup]") {
+    // The segment is created before it is sized and mapped, so every failure
+    // after shm_open() has to unlink it again - close() alone never does.
+    // A size this large is accepted by ftruncate() on tmpfs but can never be
+    // mapped, which drives the failure into the mmap() path.
+    std::string name = unique_name("test_leak");
+    shm_cleanup cleanup{name};
+
+    constexpr std::size_t unmappable_size = std::size_t{1} << 62;
+    shared_memory shm(name.c_str(), unmappable_size, create_only,
+                      access_mode::read_write, std::nothrow);
+
+    REQUIRE_FALSE(shm.is_valid());
+    REQUIRE(shm.last_error());
+    REQUIRE_FALSE(shared_memory::exists(name.c_str()));
+}
+#endif
+
+#ifdef SLICK_SHM_POSIX
+TEST_CASE("Failed open does not leak the descriptor", "[error][cleanup]") {
+    // Build a segment out of band whose size can never be mapped, so that the
+    // library's open() gets past shm_open()/fstat() and fails at mmap().
+    std::string name = unique_name("test_ofd");
+    shm_cleanup cleanup{name};
+
+    std::string path = "/" + name;
+    int fd = shm_open(path.c_str(), O_CREAT | O_EXCL | O_RDWR, 0666);
+    REQUIRE(fd != -1);
+    bool sized = ftruncate(fd, static_cast<off_t>(std::size_t{1} << 62)) == 0;
+    ::close(fd);
+
+    if (!sized) {
+        return;  // platform refuses the size outright - nothing to exercise
+    }
+
+    int before = count_open_fds();
+
+    shared_memory shm(name.c_str(), open_existing, access_mode::read_write, std::nothrow);
+
+    REQUIRE_FALSE(shm.is_valid());
+    REQUIRE(shm.last_error());
+
+    // Checked while shm is still alive: the descriptor has to be released on
+    // the error path, not merely by the destructor.
+    if (before >= 0) {
+        REQUIRE(count_open_fds() == before);
+    }
+}
+#endif
