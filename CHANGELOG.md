@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.1.6] - 2026-08-30
 
 ### Changed
 - `shared_memory_view` is now allocation-free to copy. It borrows the name pointer
