@@ -16,6 +16,7 @@ add_executable(slick_shm_tests
     test_move_semantics.cpp
     test_cross_process.cpp
     test_is_creator.cpp
+    test_view.cpp
 )
 
 target_link_libraries(slick_shm_tests PRIVATE

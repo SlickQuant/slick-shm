@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include <memory>
 #include "../error.hpp"
 #include "../types.hpp"
 
@@ -28,6 +29,43 @@ namespace detail {
 
 // Platform constants
 constexpr std::size_t MAX_NAME_LENGTH = 255;
+
+// Address-stable storage for the name handed out by shared_memory::name().
+//
+// shared_memory_view borrows that pointer, so the characters must stay put when
+// the owning shared_memory is moved - only the owning pointer moves, which keeps
+// views built from the source valid. A std::string cannot promise that: small
+// names live inside the string object itself, so moving the owner would relocate
+// them and leave every view pointing into the moved-from object.
+class stable_name {
+public:
+    stable_name() = default;
+
+    stable_name(stable_name&&) noexcept = default;
+    stable_name& operator=(stable_name&&) noexcept = default;
+
+    stable_name(const stable_name&) = delete;
+    stable_name& operator=(const stable_name&) = delete;
+
+    stable_name& operator=(const char* name) {
+        if (name == nullptr) {
+            buffer_.reset();
+            return *this;
+        }
+        std::size_t len = std::strlen(name);
+        std::unique_ptr<char[]> buffer(new char[len + 1]);
+        std::memcpy(buffer.get(), name, len + 1);
+        buffer_ = std::move(buffer);
+        return *this;
+    }
+
+    const char* c_str() const noexcept {
+        return buffer_ ? buffer_.get() : "";
+    }
+
+private:
+    std::unique_ptr<char[]> buffer_;
+};
 
 #ifdef SLICK_SHM_WINDOWS
 

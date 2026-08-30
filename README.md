@@ -219,6 +219,17 @@ shared_memory shm("name", 1024, create_only);
 shared_memory_view view(shm);  // Lightweight, copyable
 ```
 
+Views are **allocation-free to copy** (they hold only `data`, `size`, `mode`, and a
+borrowed name pointer), which makes them cheap to pass by value into worker
+threads or hot data paths. The `name()` pointer is **non-owning**: it refers to
+the `shared_memory` object (or caller-provided buffer) the view was built from,
+so that source must outlive the view.
+
+Moving the source is safe: `shared_memory` keeps its name in address-stable
+storage, so a view stays valid when its source is moved or move-assigned,
+including when a `std::vector<shared_memory>` reallocates. Building a view from a
+temporary is rejected at compile time.
+
 ### Error Handling
 
 #### Exception-Based

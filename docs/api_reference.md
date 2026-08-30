@@ -196,6 +196,20 @@ shared_memory::remove("my_shm");
 
 A non-owning, lightweight view into shared memory.
 
+> **Lifetime**: The view is non-owning in every respect. In particular `name()`
+> returns a borrowed pointer to the segment name stored by the `shared_memory`
+> object (or the caller-provided buffer) the view was built from — the source
+> must outlive any view that references it.
+>
+> Moving the source is safe - `shared_memory` stores its name in address-stable
+> storage, so a view survives a move or move-assignment of its source, including
+> a `std::vector<shared_memory>` reallocation. Constructing a view from a
+> temporary `shared_memory` is rejected at compile time.
+>
+> **Copy cost**: Copying a `shared_memory_view` is allocation-free (plain
+> pointer/word copies), so views are cheap to pass by value, including into
+> worker threads.
+
 #### Constructors
 
 ```cpp

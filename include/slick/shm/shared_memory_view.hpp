@@ -4,13 +4,9 @@
 #pragma once
 
 #include "shared_memory.hpp"
-#include <string>
 
 namespace slick {
 namespace shm {
-
-// Forward declaration
-class shared_memory;
 
 /**
  * @brief Non-owning view into shared memory
@@ -18,6 +14,15 @@ class shared_memory;
  * This class provides a lightweight, copyable view into shared memory without
  * managing its lifetime. Useful for passing shared memory references around
  * without transferring ownership.
+ *
+ * @note The view owns nothing, name included: name() hands back a pointer into
+ *       storage owned by the shared_memory object (or the caller-provided
+ *       buffer) it was built from, so that source must outlive the view.
+ *       Moving the source is safe - shared_memory holds its name in
+ *       address-stable storage, so views stay valid across a move of it, a
+ *       std::vector<shared_memory> reallocation included.
+ *
+ * @note Copying a view is allocation-free: copies are plain pointer copies.
  *
  * Thread safety: Individual shared_memory_view objects are not thread-safe.
  */
@@ -27,13 +32,25 @@ public:
      * @brief Default constructor - creates an invalid view
      */
     shared_memory_view() noexcept
-        : data_(nullptr), size_(0), name_(), mode_(access_mode::read_write) {}
+        : data_(nullptr), size_(0), name_(""), mode_(access_mode::read_write) {}
 
     /**
      * @brief Construct view from a shared_memory object
      * @param shm The shared_memory object to view
      */
-    explicit shared_memory_view(const shared_memory& shm) noexcept;
+    explicit shared_memory_view(const shared_memory& shm) noexcept
+        : data_(const_cast<void*>(shm.data())),
+          size_(shm.size()),
+          name_(shm.name()),
+          mode_(shm.mode()) {}
+
+    /**
+     * @brief Deleted - a view cannot be built from a temporary
+     *
+     * Every member of the view would dangle the moment the full expression
+     * ends, so this is rejected at compile time rather than at runtime.
+     */
+    explicit shared_memory_view(shared_memory&&) = delete;
 
     /**
      * @brief Construct view from raw parameters
@@ -46,9 +63,9 @@ public:
                        access_mode mode = access_mode::read_write) noexcept
         : data_(data), size_(size), name_(name ? name : ""), mode_(mode) {}
 
-    // Copyable
-    shared_memory_view(const shared_memory_view&) = default;
-    shared_memory_view& operator=(const shared_memory_view&) = default;
+    // Copyable - cheap, allocation-free (plain pointer members)
+    shared_memory_view(const shared_memory_view&) noexcept = default;
+    shared_memory_view& operator=(const shared_memory_view&) noexcept = default;
 
     // Moveable
     shared_memory_view(shared_memory_view&&) noexcept = default;
@@ -80,10 +97,12 @@ public:
 
     /**
      * @brief Get the name of the shared memory
-     * @return Name string, or empty if invalid
+     * @return Borrowed pointer to the name, or "" if the view carries none. It
+     *         is owned by the source the view was built from and stays valid
+     *         for as long as that source lives, across moves of it.
      */
     const char* name() const noexcept {
-        return name_.c_str();
+        return name_;
     }
 
     /**
@@ -105,17 +124,9 @@ public:
 private:
     void* data_;
     std::size_t size_;
-    std::string name_;
+    const char* name_;  // Non-owning; must outlive the view
     access_mode mode_;
 };
-
-// Implementation of constructor from shared_memory
-// This is defined here after shared_memory_view is fully defined
-inline shared_memory_view::shared_memory_view(const shared_memory& shm) noexcept
-    : data_(const_cast<void*>(shm.data())),
-      size_(shm.size()),
-      name_(shm.name()),
-      mode_(shm.mode()) {}
 
 }  // namespace shm
 }  // namespace slick

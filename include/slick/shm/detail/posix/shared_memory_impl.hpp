@@ -277,7 +277,7 @@ private:
     int shm_fd_ = -1;
     void* mapped_addr_ = nullptr;
     std::string name_;  // Formatted name with "/" prefix for POSIX API
-    std::string original_name_;  // Original name without prefix for public accessor
+    stable_name original_name_;  // Original name for public accessor; address-stable for views
     std::size_t size_ = 0;
     access_mode mode_ = access_mode::read_write;
     bool owns_shm_ = false;  // Track if we created it (for unlinking)

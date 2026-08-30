@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Changed
+- `shared_memory_view` is now allocation-free to copy. It borrows the name pointer
+  instead of holding its own `std::string`, so `sizeof(shared_memory_view)` drops from
+  56 to 32 bytes and its copy constructor and copy assignment become `noexcept`. Passing
+  a view by value no longer allocates - which it previously did for any name longer than
+  the standard library's small-string capacity (15 characters on MSVC).
+- To make that borrow sound, `shared_memory` now keeps the name behind `name()` in
+  address-stable storage rather than a `std::string`. Moving a `shared_memory` transfers
+  a pointer and leaves the characters where they are, so views built from it stay valid
+  across a move, a move-assignment, or a `std::vector<shared_memory>` reallocation. As a
+  side effect `sizeof(shared_memory)` drops from 112 to 88 bytes.
+- Constructing a `shared_memory_view` from a temporary `shared_memory` is now a
+  compile-time error rather than an immediately dangling view.
 - `access_mode` now means the same thing on every platform: it restricts the calling
   process's mapping, not the segment. Windows used to pass `PAGE_READONLY` to
   `CreateFileMapping()` when a segment was created `read_only`, which made the section

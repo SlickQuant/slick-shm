@@ -251,7 +251,7 @@ private:
     HANDLE file_mapping_handle_ = INVALID_HANDLE_VALUE;
     void* mapped_view_ = nullptr;
     platform_string name_;          // std::wstring in UNICODE, std::string otherwise
-    std::string name_utf8_;         // Always UTF-8 for name() accessor
+    stable_name name_utf8_;         // Always UTF-8 for name() accessor; address-stable for views
     std::size_t size_ = 0;
     access_mode mode_ = access_mode::read_write;
     bool is_creator_ = false;       // True if this object created the shared memory
