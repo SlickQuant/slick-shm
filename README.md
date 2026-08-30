@@ -304,6 +304,7 @@ See [platform_notes.md](docs/platform_notes.md) for detailed information.
 3. **Synchronize access**: Use `std::atomic` or external synchronization
 4. **Handle errors**: Always check for errors (exceptions or `is_valid()`)
 5. **Use views**: Pass `shared_memory_view` to avoid ownership confusion
+6. **Trust `size()`, not your request**: with `open_or_create` / `open_always` an existing segment may keep its own size, so `size()` can be smaller than the size you asked for. Use `create_only` when the size must be exact. See [Sizing an existing segment](docs/api_reference.md#sizing-an-existing-segment)
 
 ## License
 

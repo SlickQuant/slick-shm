@@ -205,6 +205,37 @@ TEST_CASE("Read-only create and open_or_create", "[access][read-only]") {
     }
 }
 
+TEST_CASE("open_always sizing of an existing segment", "[create][open_always]") {
+    // Once the segment exists, the size passed to open_always is only a
+    // request - see "Sizing an existing segment" in docs/api_reference.md.
+    std::string name = unique_name("test_oa_size");
+    shm_cleanup cleanup{name};
+
+    shared_memory creator(name.c_str(), 4096, create_only);
+    REQUIRE(creator.is_valid());
+    const std::size_t created_size = creator.size();
+
+    // Deliberately grows: shrinking a segment that `creator` still has mapped
+    // would leave it facing SIGBUS past the new end on Linux.
+    shared_memory opener(name.c_str(), created_size * 4, open_always);
+    REQUIRE(opener.is_valid());
+
+#if defined(SLICK_SHM_LINUX)
+    // Linux resizes an existing segment even while it is mapped.
+    REQUIRE(opener.size() == created_size * 4);
+#elif defined(SLICK_SHM_WINDOWS)
+    // Windows hands back the existing section untouched.
+    REQUIRE(opener.size() == created_size);
+#endif
+    // macOS depends on whether the segment is held open elsewhere, so the
+    // outcome there is deliberately left unasserted.
+
+    // What every platform does guarantee: the mapping really is size() bytes,
+    // which is why callers must work from size() and not from their request.
+    REQUIRE(opener.size() > 0);
+    std::memset(opener.data(), 0, opener.size());
+}
+
 TEST_CASE("RAII cleanup", "[raii]") {
     std::string name = unique_name("test_raii");
     shm_cleanup cleanup{name};

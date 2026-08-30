@@ -28,6 +28,15 @@
   the kernel does) is now accepted; a backslash anywhere past the prefix, or a prefix
   with no object name after it, is still invalid.
 
+### Documentation
+- Document that `size` is a request, not a guarantee, once the segment already exists.
+  `open_always` resizes on Linux, resizes on macOS only when no other process holds the
+  segment open, and never resizes on Windows - so `size()` can come back **smaller than
+  requested**, and on Linux an existing segment can be shrunk while other processes have
+  it mapped. Adds a per-platform table and the `size()` check idiom to the API reference,
+  rewrites the macOS-only note in the platform notes to cover all three platforms, and
+  adds a best-practice line to the README. A test now pins the per-platform outcome.
+
 ## [v0.1.5] - 2026-08-19
 
 ### Fixed

@@ -275,7 +275,7 @@ shared_memory::remove("test");
 - Shared memory persists after crash (manual cleanup needed)
 - Short name limit on macOS (31 chars)
 - System limits may need adjustment for large allocations
-- **`open_always` mode limitation**: On macOS, attempting to truncate an existing shared memory segment with `open_always` while another process has it open will fail with `EINVAL`. The library handles this gracefully by preserving the existing size instead of failing. To ensure `open_always` can resize an existing segment, ensure no other processes have it open, or use `open_or_create` instead which doesn't attempt to resize existing segments.
+- **`open_always` does not guarantee the requested size**: only Linux actually resizes an existing segment. macOS resizes one only when no other process has it open - otherwise `ftruncate` reports `EINVAL` and the library keeps the existing size rather than failing. Windows never resizes an existing section at all; `CreateFileMapping()` returns it as it stands and the requested size is ignored. So `size()` can be **smaller than requested** on macOS and Windows, and on Linux an existing segment can be **shrunk while other processes have it mapped**, which leaves them facing `SIGBUS` past the new end. Always drive your writes from `size()`, not from the size you passed in, and use `create_only` when the size has to be exact. See [Sizing an existing segment](api_reference.md#sizing-an-existing-segment) in the API reference.
 
 ## Debugging
 

@@ -27,7 +27,8 @@ shared_memory(const char* name, std::size_t size, create_only_t,
 shared_memory(const char* name, std::size_t size, open_or_create_t,
               access_mode mode = access_mode::read_write);
 
-// Create, truncate if exists
+// Create, resize if exists (see "Sizing an existing segment" below - the
+// requested size is not guaranteed to be applied on every platform)
 shared_memory(const char* name, std::size_t size, open_always_t,
               access_mode mode = access_mode::read_write);
 
@@ -252,9 +253,39 @@ future writers.
 enum class create_mode {
     create_only,      // Create new, fail if exists
     open_or_create,   // Open existing or create new
-    open_always       // Always create (truncate if exists)
+    open_always       // Create, or resize an existing segment where possible
 };
 ```
+
+#### Sizing an existing segment
+
+`size` is a request, not a guarantee. It is applied exactly only when the call
+creates the segment. When `open_or_create` or `open_always` finds an existing
+segment, what happens to its size is platform-dependent:
+
+| Platform | `open_always` against an existing segment of a different size |
+|----------|--------------------------------------------------------------|
+| Linux    | Resized to the requested size - it both grows and shrinks, even while other processes have it mapped, and those processes get `SIGBUS` past the new end |
+| macOS    | Resized only when no other process has it open; otherwise the existing size is kept (`ftruncate` reports `EINVAL`) |
+| Windows  | Never resized - the existing section is returned unchanged |
+
+`open_or_create` never attempts a resize on any platform.
+
+The consequence worth guarding against: **`size()` can come back smaller than
+you asked for.** Always size your work from `size()` rather than from the value
+you passed in.
+
+```cpp
+shared_memory shm("my_shm", 16384, open_always);
+
+if (shm.size() < 16384) {
+    // An existing, smaller segment this platform would not resize.
+    // Writing 16384 bytes here would run off the end of the mapping.
+}
+```
+
+Use `create_only` when the size has to be exact - it fails outright rather than
+handing back a segment somebody else sized.
 
 ### Tag Types
 
