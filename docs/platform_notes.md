@@ -97,12 +97,23 @@ shared_memory shm("/my_shm", 1024, create_only);
 
 ### Size Limits
 
-- Default maximum: Check `/proc/sys/kernel/shmmax`
-- Typical default: 32 MB to several GB
-- Can be increased via `sysctl` (requires root):
-  ```bash
-  sudo sysctl -w kernel.shmmax=<bytes>
-  ```
+Bounded by the tmpfs mounted at `/dev/shm`, whose size caps the total of all
+POSIX shared memory on the system:
+
+- Default size: half of physical RAM
+- Check available space: `df -h /dev/shm`
+- Increase: `sudo mount -o remount,size=8G /dev/shm` (or an `/etc/fstab` entry)
+- Docker defaults to only 64 MB - raise it with `docker run --shm-size=1g`
+- Under cgroups, pages are charged to the process that first touches them
+
+**Important**: `kernel.shmmax` and `kernel.shmall` do **not** apply. Those govern
+System V shared memory (`shmget()`), a separate mechanism this library does not
+use. Since Linux 4.14 their defaults are effectively unlimited anyway.
+
+**Important**: `ftruncate()` extends the object sparsely, so requesting more than
+`/dev/shm` can supply may succeed at creation and fail much later - a process
+touching a page tmpfs cannot back receives `SIGBUS`. Size segments against
+`df -h /dev/shm`.
 
 ### Cleanup
 
@@ -141,9 +152,14 @@ shared_memory shm("shm", 1024, create_only);  // Becomes "/shm"
 
 ### Size Limits
 
-- Check: `sysctl kern.sysv.shmmax`
-- Typically smaller than Linux by default
-- Can be increased but requires kernel parameter changes
+- No dedicated tunable: POSIX shared memory is backed by anonymous memory, so the
+  practical ceiling is physical memory plus swap, and the process address space
+- There is no `/dev/shm` on macOS; objects are not visible in the filesystem
+- Sizes are fixed at creation in practice: `ftruncate()` fails with `EINVAL` once
+  another process has the object open, so every opener sees the creator's size
+
+**Important**: `kern.sysv.shmmax` and friends do **not** apply. Those govern
+System V shared memory (`shmget()`), which this library does not use.
 
 ### Cleanup
 
@@ -184,18 +200,20 @@ To ensure portability across all platforms:
 
 ### Summary Table
 
-| Platform | Typical Default | Maximum (Practical) |
-|----------|----------------|---------------------|
-| Windows 64-bit | No hard limit | TB range |
-| Windows 32-bit | ~2 GB | ~2-3 GB |
-| Linux | 32 MB - several GB | System RAM |
-| macOS | Several MB - GB | System RAM |
+| Platform | Backing Store | Typical Ceiling |
+|----------|---------------|-----------------|
+| Windows 64-bit | Paging file | TB range (address space) |
+| Windows 32-bit | Paging file | ~2-3 GB (address space) |
+| Linux | `/dev/shm` tmpfs | Half of RAM (64 MB under Docker) |
+| macOS | Anonymous memory | Physical memory + swap |
 
 ### Recommendations
 
 - **Small data** (< 1 MB): Works everywhere
-- **Medium data** (1 MB - 100 MB): Check system limits
-- **Large data** (> 100 MB): May require system configuration
+- **Medium data** (1 MB - 100 MB): Check `df -h /dev/shm` on Linux; Docker's
+  64 MB default is the limit most often hit first
+- **Large data** (> 100 MB): Remount `/dev/shm` larger on Linux, or run
+  containers with `--shm-size`
 
 ## Permissions
 
@@ -292,8 +310,8 @@ shared_memory::remove("test");
 # List shared memory segments
 ls -lh /dev/shm
 
-# Check system limits
-cat /proc/sys/kernel/shmmax
+# Check the size limit (the /dev/shm mount, not kernel.shmmax)
+df -h /dev/shm
 
 # Remove orphaned segment
 rm /dev/shm/my_shm
